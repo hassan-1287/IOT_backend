@@ -6,7 +6,6 @@ import (
 	"ginframework/intarnel/config"
 	"ginframework/intarnel/database"
 	"log"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,14 +27,14 @@ func main() {
 
 	pool, err = database.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Println("Failed to connect to database:", err)
+		log.Fatal("Faild to connect to databse:", err)
 	}
 	defer pool.Close()
 
 	r := gin.Default()
-	r.GET("/pong", func(ctx *gin.Context) { ctx.JSON(http.StatusOK, gin.H{"msg": "ping"}) })
+
 	r.GET("/login", handlers.Login)
-	r.GET("/callbackfromgoogle", handlers.CallBackFromGoogle)
+	r.GET("/callbackfromgoogle", handlers.CallBackFromGoogle(pool))
 	r.Run(":" + cfg.Port)
 
 }

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"ginframework/intarnel/auth"
 	gconfig "ginframework/intarnel/auth/config"
+	"ginframework/intarnel/auth/repository"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 /*
@@ -24,43 +26,49 @@ func Login(ctx *gin.Context) {
 }
 
 // *الداله تعمل بعد العوده من كوكل وتمرير البيانات الى السيرفر الخاص بي
-func CallBackFromGoogle(c *gin.Context) {
-	var ctx context.Context = context.Background()
-	stateFromURL := c.Query("state")
-	codeFromURL := c.Query("code")
+func CallBackFromGoogle(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var ctx context.Context = context.Background()
+		stateFromURL := c.Query("state")
+		codeFromURL := c.Query("code")
 
-	if stateFromURL == "" || codeFromURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "meassing value from url"})
-	}
+		if stateFromURL == "" || codeFromURL == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "meassing value from url"})
+		}
 
-	code := c.Query("code")
-	token, err := gconfig.GoogleConfig.Exchange(ctx, code)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
+		code := c.Query("code")
+		token, err := gconfig.GoogleConfig.Exchange(ctx, code)
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
 
-	client := gconfig.GoogleConfig.Client(ctx, token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
+		client := gconfig.GoogleConfig.Client(ctx, token)
+		resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
 
-	}
-	defer resp.Body.Close()
+		}
+		defer resp.Body.Close()
 
-	var userInfo auth.GoogleUserInfo
-	
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error",
-			"msg":   "no data err!!!!",
-			"error": err.Error(),
+		var userInfo auth.GoogleUserInfo
+
+		if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error",
+				"msg":   "no data err!!!!",
+				"error": err.Error(),
+			})
+			return
+		}
+
+		user, err := repository.CreateNewUser(pool, userInfo)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"status": "تم تسجيل الدخول بنجاخ",
+			"user":   user,
 		})
-		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "تم تسجيل الدخول بنجاح!",
-		"user":    userInfo,
-	})
 }
