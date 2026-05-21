@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	// gin.SetMode(gin.ReleaseMode)
+
 
 	var cfg *config.Config
 	var err error
