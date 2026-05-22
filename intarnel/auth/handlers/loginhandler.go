@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"ginframework/intarnel/auth"
 	gconfig "ginframework/intarnel/auth/config"
+	"ginframework/intarnel/auth/middleware"
 	"ginframework/intarnel/auth/repository"
 	"net/http"
 
@@ -15,12 +16,17 @@ import (
 /*
 *  داله تسجيل الدخول ثم رابط التوجيه الى كوكل
  */
+var stateStore = map[string]bool{}
+
 func Login(ctx *gin.Context) {
 	state, err := auth.GenerateState(64)
 	if err != nil {
 		return
 	}
+	stateStore[state] = true
+
 	url := gconfig.GoogleConfig.AuthCodeURL(state)
+
 	ctx.Redirect(http.StatusTemporaryRedirect, url)
 
 }
@@ -29,11 +35,25 @@ func Login(ctx *gin.Context) {
 func CallBackFromGoogle(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var ctx context.Context = context.Background()
+
 		stateFromURL := c.Query("state")
 		codeFromURL := c.Query("code")
 
 		if stateFromURL == "" || codeFromURL == "" {
+			c.JSON(400, gin.H{"error": "missing values"})
+			return
+		}
+
+		if !stateStore[stateFromURL] {
+			c.JSON(401, gin.H{"error": "invalid state"})
+			return
+		}
+		
+		delete(stateStore, stateFromURL)
+
+		if stateFromURL == "" || codeFromURL == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "meassing value from url"})
+			return
 		}
 
 		code := c.Query("code")
@@ -63,11 +83,17 @@ func CallBackFromGoogle(pool *pgxpool.Pool) gin.HandlerFunc {
 		}
 
 		user, err := repository.CreateNewUser(pool, userInfo)
+		jwtToken, err := middleware.GenerateToken(user.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to generate token",
+			})
+			return
 		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"status": "تم تسجيل الدخول بنجاخ",
+			"status": "تم تسجيل الدخول بنجاح",
+			"token":  jwtToken,
 			"user":   user,
 		})
 	}
