@@ -2,6 +2,9 @@
 .env
 *.env
 
+.air.toml
+*.air.tomal
+
 # تجاهل الملفات التنفيذية التي تنتج عند بناء المشروع في Go
 /dist/
 /target/

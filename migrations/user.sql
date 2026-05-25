@@ -1,4 +1,4 @@
--- Active: 1774610340517@@127.0.0.1@5432@forme
+-- Active: 1779046001743@@localhost@5432@gratedata
 
 CREATE TABLE IF NOT EXISTS users (
     idme UUID DEFAULT gen_random_uuid() PRIMARY KEY,
