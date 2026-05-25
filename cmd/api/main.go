@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-
+	gin.ForceConsoleColor()
 	var cfg *config.Config
 	var err error
 
